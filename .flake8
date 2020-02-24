@@ -1,0 +1,7 @@
+[flake8]
+exclude =
+        .direnv,
+        .git,
+        __pycache__,
+        build,
+        dist
