@@ -1,6 +1,6 @@
 import os
-import pickle
-import sys
+
+# import pickle
 
 from dotenv import load_dotenv
 from coned import Coned
