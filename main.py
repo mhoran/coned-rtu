@@ -18,8 +18,12 @@ OPOWER_METER = os.getenv("OPOWER_METER")
 
 coned = Coned(CONED_USER, CONED_PASS, CONED_TOTP, OPOWER_ACCOUNT_ID, OPOWER_METER)
 
-coned.login()
-usage_json = coned.get_usage()
+try:
+    coned.login()
+    usage_json = coned.get_usage()
+except Exception as e:
+    coned.save_screenshot("error.png")
+    raise e
 
 # Save cookies for use next time
 # cookies = driver.get_cookies()

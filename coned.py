@@ -1,6 +1,6 @@
 import pyotp
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -11,6 +11,10 @@ CONED_USAGE_URL = (
 )
 
 DEFAULT_TIMEOUT_SEC = 10
+
+
+class LoginFailedException(Exception):
+    pass
 
 
 class Coned:
@@ -40,10 +44,17 @@ class Coned:
         self.driver.find_element_by_id("form-login-password").send_keys(self.password)
         self.driver.find_element_by_id("form-login-password").submit()
 
-        # Wait for login form to get to 2FA step
-        tfa_field = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-            EC.element_to_be_clickable((By.ID, "form-login-mfa-code"))
-        )
+        # Wait for login form to get to 2FA step.
+        try:
+            tfa_field = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
+                EC.element_to_be_clickable((By.ID, "form-login-mfa-code"))
+            )
+        except TimeoutException as e:
+            # If it times out, it's probably due to bad credentials.
+            if self.is_bad_login():
+                raise LoginFailedException
+            else:
+                raise e
 
         # Submit 2FA form
         totp = pyotp.TOTP(self.totp)
@@ -66,8 +77,8 @@ class Coned:
         )
         rtu_button.click()
 
-        # Wait for "Download your real-time usage" in the iframe to appear so that it
-        # triggers authentication on the opower side
+        # Wait for "Download your real-time usage" in the iframe to appear so
+        # that it triggers authentication on the opower side
         iframe = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//*[@id='sectionRealTimeData']/iframe")
@@ -82,11 +93,30 @@ class Coned:
         self.driver.get(self.opower_usage_url())
         return self.driver.find_element_by_tag_name("body").text
 
-    # at_login_page returns whether the driver is at the ConEd login page by
-    # looking for the login form.
+    def save_screenshot(self, filename):
+        '''
+        Saves a 1080p screenshot of the page with the given filename in
+        the screenshots folder. Doesn't reset the window size.
+        '''
+        path = f"screenshots/{filename}.png"
+        self.driver.set_window_size(1920, 1080)
+        self.driver.save_screenshot(path)
+
     def at_login_page(self):
+        '''
+        at_login_page returns whether the driver is at the ConEd login
+        page by looking for the login form.
+        '''
         try:
             self.driver.find_element_by_id("form-login-email")
             return True
         except NoSuchElementException:
             return False
+
+    def is_bad_login(self):
+        '''
+        is_bad_login returns whether there is a failed login indicator
+        on the page.
+        '''
+        bad_login = self.driver.find_element_by_class_name("login-form__container-error")
+        return 'you entered does not match our records' in bad_login.text
