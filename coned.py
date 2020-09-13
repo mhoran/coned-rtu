@@ -7,11 +7,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 CONED_LOGIN_URL = "https://www.coned.com/en/login"
 CONED_USAGE_URL = (
-    "https://www.coned.com/en/accounts-billing/dashboard?tab1=billingandusage-1"
+    "https://www.coned.com/en/accounts-billing/dashboard?tab1=billingandusage-1&tab3=sectionRealTimeData-3"
 )
 
-DEFAULT_TIMEOUT_SEC = 10
-
+DEFAULT_TIMEOUT_SEC = 30
 
 class LoginFailedException(Exception):
     pass
@@ -33,11 +32,7 @@ class Coned:
         return f"https://cned.opower.com/ei/edge/apis/cws-real-time-ami-v1/cws/cned/accounts/{self.account_id}/meters/{self.meter}/usage"  # noqa
 
     def login(self):
-        # Try to load the Billing and Usage page. If we find ourselves at the
-        # login page, then we need to login. If not, we have nothing to do.
-        self.driver.get(CONED_USAGE_URL)
-        if not self.at_login_page():
-            return
+        self.driver.get(CONED_LOGIN_URL)
 
         # Submit the login form
         self.driver.find_element_by_id("form-login-email").send_keys(self.user)
@@ -69,14 +64,6 @@ class Coned:
     def get_usage(self):
         self.driver.get(CONED_USAGE_URL)
 
-        # Go to "real time usage"
-        rtu_button = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[@data-value='sectionRealTimeData']")
-            )
-        )
-        rtu_button.click()
-
         # Wait for "Download your real-time usage" in the iframe to appear so
         # that it triggers authentication on the opower side
         iframe = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
@@ -98,20 +85,8 @@ class Coned:
         Saves a 1080p screenshot of the page with the given filename in
         the screenshots folder. Doesn't reset the window size.
         '''
-        path = f"screenshots/{filename}.png"
         self.driver.set_window_size(1920, 1080)
-        self.driver.save_screenshot(path)
-
-    def at_login_page(self):
-        '''
-        at_login_page returns whether the driver is at the ConEd login
-        page by looking for the login form.
-        '''
-        try:
-            self.driver.find_element_by_id("form-login-email")
-            return True
-        except NoSuchElementException:
-            return False
+        self.driver.save_screenshot(filename)
 
     def is_bad_login(self):
         '''

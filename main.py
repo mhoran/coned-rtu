@@ -1,7 +1,6 @@
 import json
 import os
 
-# import pickle
 import dateutil.parser
 
 from dotenv import load_dotenv
@@ -24,10 +23,6 @@ try:
 except Exception as e:
     coned.save_screenshot("error.png")
     raise e
-
-# Save cookies for use next time
-# cookies = driver.get_cookies()
-# pickle.dump(cookies, open("cookies.dat","wb"))
 
 usage = json.loads(usage_json)
 
