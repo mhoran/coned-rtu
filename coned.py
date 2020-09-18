@@ -26,7 +26,9 @@ class Coned:
 
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")
-        self.driver = webdriver.Chrome(chrome_options=options)
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        self.driver = webdriver.Chrome(options=options)
 
     def opower_usage_url(self):
         return f"https://cned.opower.com/ei/edge/apis/cws-real-time-ami-v1/cws/cned/accounts/{self.account_id}/meters/{self.meter}/usage"  # noqa
