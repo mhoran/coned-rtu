@@ -1,4 +1,4 @@
-FROM selenium/standalone-chrome
+FROM selenium/standalone-chrome@sha256:56384f50933cc85ded9e671df4817934b9b7c2df7ef2cd302b1fe1a4ccaa80a8
 
 USER root
 RUN apt-get update && apt-get upgrade -yq
