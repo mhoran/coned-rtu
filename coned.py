@@ -1,19 +1,6 @@
+import json
+import mechanize
 import pyotp
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-
-CONED_LOGIN_URL = "https://www.coned.com/en/login"
-CONED_USAGE_URL = (
-    "https://www.coned.com/en/accounts-billing/dashboard?tab1=billingandusage-1&tab3=sectionRealTimeData-3"
-)
-
-DEFAULT_TIMEOUT_SEC = 30
-
-class LoginFailedException(Exception):
-    pass
 
 
 class Coned:
@@ -24,76 +11,47 @@ class Coned:
         self.account_id = account_id
         self.meter = meter
 
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        self.driver = webdriver.Chrome(options=options)
+        self.browser = mechanize.Browser()
+        self.browser.set_handle_robots(False)
 
     def opower_usage_url(self):
         return f"https://cned.opower.com/ei/edge/apis/cws-real-time-ami-v1/cws/cned/accounts/{self.account_id}/meters/{self.meter}/usage"  # noqa
 
     def login(self):
-        self.driver.get(CONED_LOGIN_URL)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.coned.com/',
+            'Content-Type': 'application/json',
+            'Origin': 'https://www.coned.com'}
+        data = json.dumps({
+            "LoginEmail": self.user,
+            "LoginPassword": self.password,
+            "LoginRememberMe": False,
+            "ReturnUrl": "",
+            "OpenIdRelayState": ""})
+        request = mechanize.Request(
+            "https://www.coned.com/sitecore/api/ssc/ConEd-Cms-Services-Controllers-Okta/User/0/Login", data, headers)
+        self.browser.open(request)
 
-        # Submit the login form
-        self.driver.find_element_by_id("form-login-email").send_keys(self.user)
-        self.driver.find_element_by_id("form-login-password").send_keys(self.password)
-        self.driver.find_element_by_id("form-login-password").submit()
-
-        # Wait for login form to get to 2FA step.
-        try:
-            tfa_field = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-                EC.element_to_be_clickable((By.ID, "form-login-mfa-code"))
-            )
-        except TimeoutException as e:
-            # If it times out, it's probably due to bad credentials.
-            if self.is_bad_login():
-                raise LoginFailedException
-            else:
-                raise e
-
-        # Submit 2FA form
         totp = pyotp.TOTP(self.totp)
-        tfa_field.send_keys(totp.now())
-        tfa_field.submit()
-
-        # Wait for dashboard to appear
-        WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@data-value='overview']"))
-        )
+        thing = json.dumps({
+            "MFACode": totp.now(),
+            "ReturnUrl": "",
+            "OpenIdRelayState": ""})
+        request = mechanize.Request(
+            'https://www.coned.com/sitecore/api/ssc/ConEd-Cms-Services-Controllers-Okta/User/0/VerifyFactor', thing, headers)
+        response = self.browser.open(request)
+        redirect_url = json.loads(response.read())["authRedirectUrl"]
+        response = self.browser.open(redirect_url)
 
     def get_usage(self):
-        self.driver.get(CONED_USAGE_URL)
-
-        # Wait for "Download your real-time usage" in the iframe to appear so
-        # that it triggers authentication on the opower side
-        iframe = WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//*[@id='sectionRealTimeData']/iframe")
-            )
-        )
-        self.driver.switch_to.frame(iframe)
-        WebDriverWait(self.driver, DEFAULT_TIMEOUT_SEC).until(
-            EC.element_to_be_clickable((By.ID, "download-link"))
-        )
+        response = self.browser.open(
+            "https://cned.opower.com/ei/x/e/usage-export?utilityCustomerId=b6f0dd6b12999567636a5db8d79d7538c73706096ee72c5320735813249743cd")
+        self.browser.select_form(id="appForm")
+        response = self.browser.submit()
 
         # Get the usage from opower
-        self.driver.get(self.opower_usage_url())
-        return self.driver.find_element_by_tag_name("body").text
-
-    def save_screenshot(self, filename):
-        '''
-        Saves a 1080p screenshot of the page with the given filename in
-        the screenshots folder. Doesn't reset the window size.
-        '''
-        self.driver.set_window_size(1920, 1080)
-        self.driver.save_screenshot(filename)
-
-    def is_bad_login(self):
-        '''
-        is_bad_login returns whether there is a failed login indicator
-        on the page.
-        '''
-        bad_login = self.driver.find_element_by_class_name("login-form__container-error")
-        return 'you entered does not match our records' in bad_login.text
+        response = self.browser.open(self.opower_usage_url())
+        return response.read()

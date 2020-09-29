@@ -22,13 +22,13 @@ MYSQL_PASS = os.getenv("MYSQL_PASS")
 MYSQL_HOST = os.getenv("MYSQL_HOST")
 MYSQL_DB = os.getenv("MYSQL_DB")
 
-coned = Coned(CONED_USER, CONED_PASS, CONED_TOTP, OPOWER_ACCOUNT_ID, OPOWER_METER)
+coned = Coned(CONED_USER, CONED_PASS, CONED_TOTP,
+              OPOWER_ACCOUNT_ID, OPOWER_METER)
 
 try:
     coned.login()
     usage_json = coned.get_usage()
 except Exception as e:
-    coned.save_screenshot("error.png")
     raise e
 
 usage = json.loads(usage_json)
@@ -49,16 +49,17 @@ for read in usage["reads"]:
     readings.append(reading)
 
 cnx = mysql.connector.connect(user=MYSQL_USER,
-        password=MYSQL_PASS,
-        host=MYSQL_HOST,
-        database=MYSQL_DB)
+                              password=MYSQL_PASS,
+                              host=MYSQL_HOST,
+                              database=MYSQL_DB)
 cursor = cnx.cursor()
 
 for r in readings:
     add_reading = ("INSERT IGNORE INTO readings "
-                  "(start, end, wh) "
-                  "VALUES (%s, %s, %s)")
-    data_reading = (r.start_time.astimezone(tz=timezone.utc), r.end_time.astimezone(tz=timezone.utc), r.wh)
+                   "(start, end, wh) "
+                   "VALUES (%s, %s, %s)")
+    data_reading = (r.start_time.astimezone(tz=timezone.utc),
+                    r.end_time.astimezone(tz=timezone.utc), r.wh)
     cursor.execute(add_reading, data_reading)
 
 cnx.commit()
