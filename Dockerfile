@@ -1,4 +1,4 @@
-FROM python:alpine@sha256:9eb16c4046fa7e9ac838563fd3b7a0e006142bb6ac944199eda5a0fa60a9cf02
+FROM python:alpine@sha256:bcca0a38a207b7b40c46e059e6ecf1ba3af833be665fb65ab8b7e81ac601e7d3
 
 WORKDIR /root
 
