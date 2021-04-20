@@ -1,5 +1,5 @@
 pyotp==2.3.0
 python-dateutil==2.8.1
 python-dotenv==0.11.0
-mysql-connector-python==8.0.21
+mysql-connector-python==8.0.24
 mechanize==0.4.5
